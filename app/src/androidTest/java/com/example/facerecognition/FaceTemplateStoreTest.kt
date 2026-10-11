@@ -7,6 +7,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -129,5 +130,25 @@ class FaceTemplateStoreTest {
 
         recognizer.clearAll()
         assertEquals(0, FaceTemplateStore(context).size)
+    }
+
+    /**
+     * The enrolment dialog's layout was restructured, and its only production inflation
+     * site is behind a "a face is currently visible" check - which the emulator's synthetic
+     * camera never satisfies. Without this test a broken layout would ship as a crash that
+     * only appears the first time a real user registers a face. Verifies the inflated view
+     * still exposes the Save/Cancel buttons the code now wires up by hand.
+     */
+    @Test
+    fun registerFaceDialogInflatesAndExposesItsButtons() {
+        val themed = androidx.appcompat.view.ContextThemeWrapper(
+            context,
+            com.example.facerecognition.R.style.Theme_FaceRecognitionApp
+        )
+        val inflater = android.view.LayoutInflater.from(themed)
+        val binding = com.example.facerecognition.databinding.DialogRegisterFaceBinding.inflate(inflater)
+        assertNotNull("name field missing", binding.etPersonName)
+        assertNotNull("in-dialog Save button missing", binding.btnSave)
+        assertNotNull("in-dialog Cancel button missing", binding.btnCancel)
     }
 }

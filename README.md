@@ -102,23 +102,82 @@ android-face-recognition-app/
 - **ML Kit Face Detection**: Face detection and tracking
 - **Kotlin Coroutines**: Asynchronous operations
 - **View Binding**: Type-safe view access
+- **AndroidX Lifecycle ViewModel**: detection state that survives rotation
 
 ## ⚠️ **Limitations**
 
-This is a **simplified implementation** for demonstration:
-- Uses basic geometric features (not deep learning)
-- Limited accuracy compared to commercial systems
-- No persistent storage
-- No security measures
+**This app detects faces; it does not verify identity.** Be specific about this, because
+the UI shows a name next to a face and a reader will otherwise assume identity checking.
+
+ML Kit's `face-detection` library returns geometry (box, head angles, landmarks, contours,
+expression probabilities) and a frame-local tracking id. It does **not** return an identity
+embedding, and none can be derived from what it gives you. `FaceRecognizer` therefore
+computes a 16-value descriptor of head pose, expression probabilities and landmark geometry
+normalised by inter-ocular distance. A "Possible match: Alex" label means *this face is in a
+similar pose and has similar facial proportions to the enrolled sample* - nothing more.
+
+What was wrong before, and is fixed: the previous descriptor included **absolute bounding-box
+and contour pixel coordinates** divided by a literal `1000f`, so cosine similarity was
+dominated by *how far and where* a face sat in the frame. Two different people at the same
+distance and pose matched each other; one person stopped matching themselves after leaning
+closer. Because that version asserted identity in the UI, it failed in the dangerous
+direction - confidently wrong, not visibly broken. The current descriptor is deliberately
+translation- and scale-invariant, the threshold is strict (`MATCH_THRESHOLD = 0.95`), and the
+copy says "possible match".
+
+Other remaining limitations:
+- No liveness check - a photograph satisfies the current matcher.
+- No authentication, encryption-at-rest, or anti-spoofing. **Never gate access to anything
+  with this.**
+- No on-device delete UI for enrolled templates (see below).
+
+### Enrolled data and where it lives
+Templates persist across restarts in app-private storage
+(`context.filesDir/face_templates.json`), with `android:allowBackup="false"` so face data is
+not included in cloud or `adb` backup. Writes are atomic and version-stamped: templates
+written by an incompatible descriptor definition are discarded rather than matched against.
+Clearing app data or uninstalling removes them. To wipe from a connected device:
+
+```bash
+adb shell pm clear com.example.facerecognition
+```
+
+Face data never leaves the device: frames are analysed in memory and are not written to disk
+and no network permission is declared.
 
 ## 🎯 **Next Steps**
 
-For production use, consider:
-- Implementing proper face embedding models (FaceNet, ArcFace)
-- Adding persistent storage for face data
-- Implementing face liveness detection
-- Adding security measures
-- Improving UI/UX
+For genuine recognition:
+- Add a real embedding model (MobileFaceNet/ArcFace via TFLite, or a cloud face API) fed an
+  *aligned, cropped* face image. This is the only way to obtain an identity descriptor. It
+  requires downloading model weights, which was not in scope here.
+- Add liveness detection (blink/turn challenge or depth-based).
+- Encrypt templates at rest and gate enrolment behind device authentication.
+- Surface an "Manage registrations" screen (list, delete individual entries).
+
+## 🧪 **Testing status**
+
+`app/src/androidTest/.../FaceTemplateStoreTest.kt` covers persistence and matching: restart
+survival, duplicate-free re-registration, entry cap, descriptor-version rejection, corrupt-store
+tolerance, mismatch rejection, and deletion. All 7 pass:
+
+```bash
+adb shell am instrument -w \
+  -e class com.example.facerecognition.FaceTemplateStoreTest \
+  "com.example.facerecognition.test/androidx.test.runner.AndroidJUnitRunner"
+```
+
+Two caveats about how much an emulator can prove:
+- `./gradlew connectedDebugAndroidTest` reports *"Failed to receive the UTP test results"* on
+  this AGP 8.1.4 / Android 16 combination. That is Gradle's result transport failing, not a
+  test failing - the same tests report `OK (7 tests)` through `am instrument` above.
+- **The AVD's synthetic camera never contains a face**, so end-to-end face detection,
+  registration through the UI, and overlay box alignment could not be observed on the
+  emulator. What *was* verified there: camera binding and fallbacks, inference actually running
+  (`FaceDetectorV2Jni` call counts), the detection toggle surviving rotation, the
+  use-after-free and rotation-crash fixes, and that the R8-minified release build still detects
+  faces. **Overlay geometry (the `FILL_CENTER` scale/offset maths) and real match behaviour
+  need a physical device with a real camera to confirm.**
 
 ## 📄 **License**
 

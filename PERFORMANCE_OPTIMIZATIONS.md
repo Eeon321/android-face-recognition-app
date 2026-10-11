@@ -1,5 +1,25 @@
 # 🚀 Face Recognition App - Performance Optimizations
 
+> ## ⚠️ **Corrections after code review - read before trusting anything below**
+>
+> This document was written against an earlier state of the code and does not describe what
+> was actually shipped. Several claims were never implemented, and several techniques listed
+> as optimizations were removed because they were actively harmful. Verified against the
+> sources at the time of the review:
+>
+> | Document claims | Reality |
+> |---|---|
+> | `setTargetResolution(Size(640, 480))` | **Never present in the code.** No resolution was configured at all. Now implemented properly via `ResolutionSelector` + `AspectRatioStrategy` (`setTargetResolution` is deprecated in CameraX 1.3). |
+> | "Wake Lock Management" (#10) | Removed. A `PARTIAL_WAKE_LOCK` held by an Activity whose only work is an on-screen camera preview keeps the CPU awake for work that cannot happen with the screen off. It bought nothing and cost battery. `WAKE_LOCK` permission removed. |
+> | "Background Service" (#11) | Removed. `FaceDetectionService` never touched the camera or ML Kit - `performFaceDetection()` only wrote a log line. It held a *camera-typed* foreground-service slot while using no camera (a Play policy problem), and on Android 14 it would have thrown `SecurityException` for the missing `FOREGROUND_SERVICE_CAMERA` permission. Deleting it also removed a `START_STICKY` restart crash and a permanently-shutdown executor. |
+> | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Removed. A Play-restricted permission that requested a battery exemption for a no-op loop. |
+> | Frame skipping (every 3rd frame) + a 500 ms gate in `processFaces` | Both removed in favour of **one** gate *before* inference. The old second gate returned *after* inference had already run, so it saved no CPU and only made drawn boxes stale. Now a single timestamp-based gate (`ANALYSIS_INTERVAL_MS`). |
+> | "Simplified feature extraction ... ~70% faster" | This was the mechanism behind a wrong-results bug, not an optimization: 13 of 20 vector slots were permanently zero because contours and classifications were disabled on the detector, and the surviving slots were absolute pixel positions. See `FaceRecognizer.kt` and the Limitations section of `README.md`. |
+>
+> What genuinely remains: single-threaded off-main-thread analysis, `STRATEGY_KEEP_ONLY_LATEST`
+> backpressure, a capped analysis resolution, one reused ML Kit detector client per Activity
+> lifetime, throttled inference keyed on frame timestamps, and R8 shrinking for release builds.
+
 ## 📊 **Optimization Summary**
 
 This document outlines all the performance optimizations implemented to reduce CPU usage, minimize device heating, and enable longer background operation.
