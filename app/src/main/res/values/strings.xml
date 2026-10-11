@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Face Recognition App</string>
+    <string name="camera_permission_required">Camera permission is required for face recognition</string>
+    <string name="storage_permission_required">Storage permission is required to save face data</string>
+    <string name="start_detection">Start Detection</string>
+    <string name="stop_detection">Stop Detection</string>
+    <string name="register_face">Register Face</string>
+    <string name="face_registered">Face registered successfully!</string>
+    <string name="face_registration_failed">Face registration failed. Please try again.</string>
+    <string name="no_face_detected">No face detected. Please position your face in the frame.</string>
+    <string name="face_recognized">Face recognized: %1$s</string>
+    <string name="unknown_face">Unknown face detected</string>
+    <string name="enter_name">Enter name for face registration</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+</resources>

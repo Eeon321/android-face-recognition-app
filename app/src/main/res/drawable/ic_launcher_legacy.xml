@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FF6200EE"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24C4,35.05 12.95,44 24,44C35.05,44 44,35.05 44,24C44,12.95 35.05,4 24,4Z"/>
+    
+    <!-- Face outline -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,12C18.48,12 14,16.48 14,22C14,27.52 18.48,32 24,32C29.52,32 34,27.52 34,22C34,16.48 29.52,12 24,12Z"/>
+    
+    <!-- Left eye -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,18C20,16.9 20.9,16 22,16C23.1,16 24,16.9 24,18C24,19.1 23.1,20 22,20C20.9,20 20,19.1 20,18Z"/>
+    
+    <!-- Right eye -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M24,18C24,16.9 24.9,16 26,16C27.1,16 28,16.9 28,18C28,19.1 27.1,20 26,20C24.9,20 24,19.1 24,18Z"/>
+    
+    <!-- Mouth -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M24,26C22.34,26 21,27.34 21,29C21,30.66 22.34,32 24,32C25.66,32 27,30.66 27,29C27,27.34 25.66,26 24,26Z"/>
+</vector> 
