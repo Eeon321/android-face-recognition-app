@@ -4,7 +4,11 @@ plugins {
 }
 
 // Release signing config is read from keystore.properties (git-ignored).
-// The keystore lives outside this repository; its location is not recorded here (see keystore.properties, which is git-ignored).
+// The keystore lives outside this repository and its path is deliberately not
+// recorded in tracked files: on a shared host, a committed absolute path tells
+// anyone who can read the repo exactly where to look for the signing key.
+// Populate keystore.properties locally (storeFile, storePassword, keyAlias,
+// keyPassword) to produce release-sign artifacts.
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
 def hasReleaseKeystore = keystorePropertiesFile.exists()

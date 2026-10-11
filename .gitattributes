@@ -1,0 +1,31 @@
+# Line-ending policy, pinned so it does not depend on each clone's core.autocrlf.
+#
+# WHY THIS MATTERS HERE: this machine has core.autocrlf=true, which happened to store
+# every blob with LF. Nothing guaranteed that. A future edit, or a clone with
+# autocrlf=false, could commit a CRLF `gradlew`, and on Linux/macOS that fails with
+# "bad interpreter: /usr/bin/env bash^M" - i.e. CI and every non-Windows collaborator
+# breaks while the committer's own machine keeps working fine.
+
+# Normalize text to LF in the repository.
+* text=auto
+
+# The POSIX wrapper script must stay LF in the checkout as well as in the blob;
+# the Windows batch file conventionally needs CRLF in the checkout.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# Never let git's text conversion touch binaries: a "normalized" jar, archive or
+# image is a corrupt one.
+*.jar binary
+*.aar binary
+*.apk binary
+*.aab binary
+*.png binary
+*.webp binary
+*.ttf binary
+*.mp4 binary
+
+# Diffs
+*.kt diff=java
+*.java diff=java
+*.xml diff=xml
