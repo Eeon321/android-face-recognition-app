@@ -3,17 +3,82 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-// Release signing config is read from keystore.properties (git-ignored).
-// The keystore lives outside this repository and its path is deliberately not
-// recorded in tracked files: on a shared host, a committed absolute path tells
-// anyone who can read the repo exactly where to look for the signing key.
-// Populate keystore.properties locally (storeFile, storePassword, keyAlias,
-// keyPassword) to produce release-sign artifacts.
+/*
+ * Release signing.
+ *
+ * Nothing secret is stored in this repository. keystore.properties (git-ignored)
+ * holds only non-secret, machine-specific settings - storeFile, keyAlias and the
+ * path to a DPAPI-protected password blob - and the password itself is resolved at
+ * configuration time by resolveReleasePassword below. See RELEASE_SIGNING.md for
+ * the setup steps and for why a release build produced on a machine without the key
+ * is silently signed with the debug certificate.
+ */
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
 def hasReleaseKeystore = keystorePropertiesFile.exists()
 if (hasReleaseKeystore) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+/*
+ * Resolves the release signing password without ever reading it from a plaintext
+ * file. Two sources, in order:
+ *
+ *   1. FACE_RELEASE_KEYSTORE_PASSWORD environment variable - for CI, where nothing
+ *      is written to disk at all.
+ *   2. A DPAPI blob protected with DataProtectionScope.CurrentUser. Only the Windows
+ *      account that created it can decrypt it, so the password is not stored in a
+ *      form that other local accounts, file backups or a casual directory listing
+ *      can read.
+ *
+ * The blob's location is read from the git-ignored keystore.properties instead of
+ * being hardcoded here, so no signing-material location ends up in tracked files.
+ *
+ * Honest limits: DPAPI is bound to this user and this machine. It does NOT protect
+ * against a process already running as you, nor against an administrator. It is a
+ * meaningful step up from plaintext (other local users, backups, shoulder-surfing,
+ * and accidental commits are all closed off), not a hardware-backed keystore.
+ */
+def resolveReleasePassword = { Properties props ->
+    def fromEnv = System.getenv("FACE_RELEASE_KEYSTORE_PASSWORD")
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+        return fromEnv.trim()
+    }
+
+    def blobPath = props["passwordFile"]
+    if (!blobPath) {
+        return null
+    }
+    // The path is interpolated into a PowerShell string literal, so refuse anything
+    // that could escape it. Legitimate Windows paths need neither of these.
+    // (Single-quoted Groovy strings: a double-quoted "$" is a GString error.)
+    if (blobPath.contains("'") || blobPath.contains('$') || blobPath.contains('`')) {
+        logger.warn("keystore.properties passwordFile contains unsupported characters; ignoring")
+        return null
+    }
+
+    try {
+        def script = "Add-Type -AssemblyName System.Security; " +
+            "\$b=[Convert]::FromBase64String((Get-Content -Raw -Path '$blobPath')); " +
+            "[Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect(\$b,\$null,'CurrentUser')).Trim()"
+        def exec = providers.exec {
+            commandLine "powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script
+        }
+        def value = exec.standardOutput.asText.get().trim()
+        return value.isEmpty() ? null : value
+    } catch (Exception e) {
+        logger.warn("Could not decrypt the release signing password (${e.class.simpleName}). " +
+            "Release artefacts will be signed with the debug key instead.")
+        return null
+    }
+}
+
+def releasePassword = hasReleaseKeystore ? resolveReleasePassword(keystoreProperties) : null
+def releaseStoreFile = hasReleaseKeystore ? keystoreProperties["storeFile"] : null
+def canSignRelease = hasReleaseKeystore && releasePassword != null &&
+        releaseStoreFile != null && file(releaseStoreFile).exists()
+if (!canSignRelease) {
+    logger.lifecycle("No release signing key resolved: producing a debug-signed release build.")
 }
 
 android {
@@ -33,11 +98,11 @@ android {
 
     signingConfigs {
         release {
-            if (hasReleaseKeystore) {
-                storeFile file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
+            if (canSignRelease) {
+                storeFile file(releaseStoreFile)
+                storePassword releasePassword
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword releasePassword
             }
         }
     }
@@ -50,9 +115,11 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // Falls back to an UNSIGNED release build if keystore.properties is absent,
-            // so CI / other machines keep working without the local keystore.
-            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            // Falls back to debug signing when the release key cannot be resolved, so
+            // CI and other machines keep producing a buildable artifact. That fallback
+            // is why a release APK from a fresh clone is NOT signed with your upload
+            // key - always check the certificate before distributing.
+            signingConfig canSignRelease ? signingConfigs.release : signingConfigs.debug
         }
     }
 

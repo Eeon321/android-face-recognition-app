@@ -179,6 +179,14 @@ Two caveats about how much an emulator can prove:
   faces. **Overlay geometry (the `FILL_CENTER` scale/offset maths) and real match behaviour
   need a physical device with a real camera to confirm.**
 
+## 🔐 **Release signing**
+
+Release artifacts are signed with a key kept **outside** this repository, and the password
+is stored as a DPAPI-protected blob rather than in a plaintext file. See
+[RELEASE_SIGNING.md](RELEASE_SIGNING.md) for the setup, the limits of that protection, and -
+most importantly - how to confirm a release APK was signed with the real key rather than
+silently falling back to the debug certificate.
+
 ## 📄 **License**
 
 This project is for educational purposes. Ensure compliance with local privacy laws when using face recognition technology. 
