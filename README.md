@@ -179,13 +179,23 @@ Two caveats about how much an emulator can prove:
   faces. **Overlay geometry (the `FILL_CENTER` scale/offset maths) and real match behaviour
   need a physical device with a real camera to confirm.**
 
+## 📚 **Documentation**
+
+| Document | Contents |
+|---|---|
+| [README.md](README.md) | This file — what the app does, its limitations, testing status |
+| [SHIPPING.md](SHIPPING.md) | **Rules for pushing and shipping**: pre-commit/pre-push security gates, history scanning, safe force-push, release certificate verification, version and tagging policy, incident response |
+| [RELEASE_SIGNING.md](RELEASE_SIGNING.md) | Signing-key storage, DPAPI scope and its limits, verifying an artifact's certificate |
+| [PERFORMANCE_OPTIMIZATIONS.md](PERFORMANCE_OPTIMIZATIONS.md) | What is actually optimized, plus a correction banner for claims in that doc that never matched the code |
+
 ## 🔐 **Release signing**
 
 Release artifacts are signed with a key kept **outside** this repository, and the password
 is stored as a DPAPI-protected blob rather than in a plaintext file. See
 [RELEASE_SIGNING.md](RELEASE_SIGNING.md) for the setup, the limits of that protection, and -
 most importantly - how to confirm a release APK was signed with the real key rather than
-silently falling back to the debug certificate.
+silently falling back to the debug certificate. The full push/ship procedure and version
+policy are in [SHIPPING.md](SHIPPING.md).
 
 ## 📄 **License**
 
