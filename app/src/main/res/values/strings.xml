@@ -1,16 +1,30 @@
 <resources>
     <string name="app_name">Face Recognition App</string>
-    <string name="camera_permission_required">Camera permission is required for face recognition</string>
-    <string name="storage_permission_required">Storage permission is required to save face data</string>
+    <string name="camera_permission_required">Camera permission required</string>
+    <string name="camera_permission_message">This app detects and draws boxes around faces using your camera. Nothing is uploaded: frames are processed on-device and never saved. Without the permission the camera preview cannot start.</string>
+    <string name="allow">Allow</string>
+    <string name="open_settings">Open app settings</string>
+    <string name="close_app">Close app</string>
+    <string name="camera_unavailable">Camera could not be started. Close other camera apps and retry.</string>
     <string name="start_detection">Start Detection</string>
     <string name="stop_detection">Stop Detection</string>
     <string name="register_face">Register Face</string>
     <string name="face_registered">Face registered successfully!</string>
     <string name="face_registration_failed">Face registration failed. Please try again.</string>
     <string name="no_face_detected">No face detected. Please position your face in the frame.</string>
-    <string name="face_recognized">Face recognized: %1$s</string>
-    <string name="unknown_face">Unknown face detected</string>
+    <!--
+      Wording matters here. The matcher compares head pose, expression probabilities and
+      eye-distance-normalised landmark geometry. That is a coarse similarity signal, not an
+      identity check, so the UI says "possible match" instead of asserting who a person is.
+      See the note in FaceRecognizer.kt.
+    -->
+    <string name="candidate_match">Possible match: %1$s (pose/geometry similarity, not verified identity)</string>
+    <string name="unknown_face">Face detected, no registered match</string>
+    <string name="unknown_face_label">Unknown</string>
+    <string name="switch_camera">Switch Camera</string>
     <string name="enter_name">Enter name for face registration</string>
+    <string name="name_hint">Name</string>
+    <string name="register_disclaimer">Stores a coarse pose/geometry template on this device only. This is not a secure biometric enrolment.</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
 </resources>

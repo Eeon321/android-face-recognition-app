@@ -33,11 +33,12 @@
         android:padding="8dp"
         android:textColor="@color/white"
         android:textSize="16sp"
+        android:visibility="invisible"
         android:layout_gravity="center"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:text="Face recognized: John Doe" />
+        tools:text="Possible match: Alex" />
 
     <LinearLayout
         android:id="@+id/controlsLayout"
@@ -65,6 +66,14 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:text="@string/register_face" />
+
+        <Button
+            android:id="@+id/btnSwitchCamera"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="@string/switch_camera" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -40,7 +40,11 @@ android {
 
     buildTypes{
         release {
-            minifyEnabled false
+            // D-17: previously minifyEnabled false, which shipped unshrunk libraries in
+            // every ABI. R8 + resource shrinking are on; see app/proguard-rules.pro for
+            // the ML Kit / CameraX keep rules this depends on.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // Falls back to an UNSIGNED release build if keystore.properties is absent,
             // so CI / other machines keep working without the local keystore.

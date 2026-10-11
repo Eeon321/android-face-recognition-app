@@ -1,23 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.facerecognition">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="true" />
 
-    <!-- Storage permissions for saving face data -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-    
-    <!-- Background processing permissions -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!--
+      Removed permissions (all of these were unused, and unused dangerous permissions
+      are a Google Play review trigger on targetSdk 34):
+        * READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE - nothing in this app ever
+          touched external storage; face templates live in app-private filesDir.
+        * WAKE_LOCK - the wake lock it backed was held by an Activity whose only work
+          is a camera preview, i.e. while the screen is already on.
+        * FOREGROUND_SERVICE / FOREGROUND_SERVICE_CAMERA - see FaceDetectionService,
+          which has been deleted (it never used the camera; a camera-typed foreground
+          service with no camera use is exactly what Play rejects).
+        * REQUEST_IGNORE_BATTERY_OPTIMIZATIONS - a Play-restricted permission that was
+          requesting exemption for a no-op background loop.
+      Had the camera-typed foreground service been kept, Android 14 (targetSdk 34)
+      would have thrown SecurityException at startForeground for the missing
+      FOREGROUND_SERVICE_CAMERA permission.
+    -->
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -36,12 +42,6 @@
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="face" />
-            
-        <service
-            android:name=".FaceDetectionService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="camera" />
     </application>
 
 </manifest>

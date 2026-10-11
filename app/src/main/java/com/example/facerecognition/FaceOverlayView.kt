@@ -4,23 +4,45 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
+import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
-import com.google.mlkit.vision.face.Face
-import java.util.HashMap
 
+/**
+ * Draws face boxes and candidate names on top of the camera preview.
+ *
+ * ── D-5: why the geometry changed ───────────────────────────────────────────
+ * The old code mapped image coordinates to the view with
+ * `scaleX = viewWidth / cameraWidth` and `scaleY = viewHeight / cameraHeight`,
+ * i.e. a non-uniform stretch. That is wrong twice over:
+ *   - `PreviewView` defaults to [PreviewView.ScaleType.FILL_CENTER], which crops
+ *     to preserve aspect ratio, so the overlay must apply the *same* uniform
+ *     scale plus a centring offset;
+ *   - ML Kit returns boxes in the space of the image *after* the frame's rotation
+ *     has been applied, so the widths/heights handed to the old code (raw analysis
+ *     width/height, and default 1280x720 when the callback used its defaults) did
+ *     not describe that space at all.
+ * The visible symptom was boxes that drift with aspect ratio, which looks like a
+ * GPU artifact but is a transform bug. Boxes are now computed from the frame's real
+ * output dimensions carried in [FaceSnapshot].
+ *
+ * ML Kit `Face` objects are no longer accepted here for exactly the reason
+ * documented on [FaceSnapshot] — they must not outlive their frame.
+ */
 class FaceOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val faceBoundsPaint = Paint().apply {
-        color = context.getColor(R.color.face_box_stroke)
-        style = Paint.Style.STROKE
-        strokeWidth = 8f // Increased stroke width for better visibility
-    }
+    private fun dp(value: Int): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics)
+
+    private fun sp(value: Int): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value.toFloat(), resources.displayMetrics)
+
+    private val boxStrokeWidth = dp(2)
 
     private val faceBackgroundPaint = Paint().apply {
         color = context.getColor(R.color.face_box_background)
@@ -30,31 +52,40 @@ class FaceOverlayView @JvmOverloads constructor(
     private val recognizedFacePaint = Paint().apply {
         color = context.getColor(R.color.recognized_face_box_stroke)
         style = Paint.Style.STROKE
-        strokeWidth = 8f // Increased stroke width for better visibility
+        strokeWidth = boxStrokeWidth
     }
 
     private val unknownFacePaint = Paint().apply {
         color = context.getColor(R.color.unknown_face_box_stroke)
         style = Paint.Style.STROKE
-        strokeWidth = 8f // Increased stroke width for better visibility
+        strokeWidth = boxStrokeWidth
     }
 
     private val textPaint = Paint().apply {
         color = Color.WHITE
-        textSize = 40f
+        textSize = sp(14)
         isFakeBoldText = true
-        setShadowLayer(5f, 0f, 0f, Color.BLACK)
     }
 
-    private var faces: List<Face> = emptyList()
-    private var recognizedFaces: Map<Int, String?>? = null
-    private var detectionEnabled = false
-    private var cameraWidth = 1280
-    private var cameraHeight = 720
+    private val labelBackgroundPaint = Paint().apply {
+        color = context.getColor(R.color.face_box_background)
+        style = Paint.Style.FILL
+    }
 
-    fun updateFaces(faces: List<Face>, recognizedFaces: Map<Int, String?>?) {
-        this.faces = faces
-        this.recognizedFaces = recognizedFaces
+    private var snapshots: List<FaceSnapshot> = emptyList()
+    private var detectionEnabled = false
+    private val unknownLabel = context.getString(R.string.unknown_face_label)
+
+    /**
+     * Set true if the preview surface mirrors the front camera. `PreviewView` in
+     * CameraX 1.3.0 does not mirror, so the default false keeps boxes aligned with
+     * what is on screen; flip this together with `PreviewView.setMirroringEnabled`
+     * if the CameraX version is ever upgraded (mirroring landed in 1.4.x).
+     */
+    private var previewMirrored = false
+
+    fun updateSnapshots(snapshots: List<FaceSnapshot>) {
+        this.snapshots = snapshots
         invalidate()
     }
 
@@ -62,73 +93,77 @@ class FaceOverlayView @JvmOverloads constructor(
         detectionEnabled = enabled
         invalidate()
     }
-    
-    fun setCameraResolution(width: Int, height: Int) {
-        cameraWidth = width
-        cameraHeight = height
+
+    fun setPreviewMirrored(mirrored: Boolean) {
+        previewMirrored = mirrored
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-
         if (!detectionEnabled) return
+        // Drop references as soon as we are done with them so a stopped camera does
+        // not keep descriptors pinned in memory.
+        val current = snapshots
+        if (current.isEmpty()) return
 
-        // Performance optimization: Skip drawing if no faces
-        if (faces.isEmpty()) return
+        val first = current.first()
+        val imageWidth = first.imageWidth
+        val imageHeight = first.imageHeight
+        if (imageWidth <= 0 || imageHeight <= 0) return
+        val mirrored = previewMirrored
 
-        // Scale factors based on actual camera resolution
-        val scaleX = width.toFloat() / cameraWidth
-        val scaleY = height.toFloat() / cameraHeight
+        // Uniform scale + centring offset: must mirror PreviewView's FILL_CENTER.
+        val scale = maxOf(width.toFloat() / imageWidth, height.toFloat() / imageHeight)
+        val offsetX = (width - imageWidth * scale) / 2f
+        val offsetY = (height - imageHeight * scale) / 2f
 
-        for (face in faces) {
-            val bounds = face.boundingBox
+        for (snapshot in current) {
+            // Per-snapshot dimensions guard against a frame boundary mid-draw.
+            if (snapshot.imageWidth != imageWidth || snapshot.imageHeight != imageHeight) continue
 
-            // Scale the face bounds to match the view size
-            val scaledBounds = Rect(
-                (bounds.left * scaleX).toInt(),
-                (bounds.top * scaleY).toInt(),
-                (bounds.right * scaleX).toInt(),
-                (bounds.bottom * scaleY).toInt()
-            )
+            val left = snapshot.bounds.left * scale + offsetX
+            val top = snapshot.bounds.top * scale + offsetY
+            val right = snapshot.bounds.right * scale + offsetX
+            val bottom = snapshot.bounds.bottom * scale + offsetY
+            val scaled = RectF(left, top, right, bottom)
 
-            // Check if this face is recognized
-            val trackingId = face.trackingId
-            val name = if (trackingId != null && recognizedFaces != null) {
-                recognizedFaces!![trackingId]
+            val name = snapshot.matchedName
+            val drawn = if (mirrored) {
+                // Mirror horizontally about the view centre so boxes track a mirrored
+                // preview surface instead of landing on the opposite side.
+                RectF(width - right, top, width - left, bottom)
             } else {
-                null
+                scaled
             }
+            canvas.drawRect(drawn, faceBackgroundPaint)
+            canvas.drawRect(drawn, if (name != null) recognizedFacePaint else unknownFacePaint)
 
-            // Draw the face box
-            val paint = when {
-                name != null -> recognizedFacePaint
-                else -> unknownFacePaint
-            }
-
-            // Draw background for the box
-            canvas.drawRect(scaledBounds, faceBackgroundPaint)
-
-            // Draw the box outline
-            canvas.drawRect(scaledBounds, paint)
-
-            // If recognized, draw the name
-            if (name != null) {
-                canvas.drawText(
-                    name,
-                    scaledBounds.left.toFloat(),
-                    scaledBounds.top.toFloat() - 10f,
-                    textPaint
-                )
-            } else {
-                // Draw "Unknown" for unrecognized faces
-                canvas.drawText(
-                    "Unknown",
-                    scaledBounds.left.toFloat(),
-                    scaledBounds.top.toFloat() - 10f,
-                    textPaint
-                )
-            }
+            drawLabel(canvas, name ?: unknownLabel, drawn)
         }
+    }
+
+    /**
+     * Labels are drawn on a filled background rect instead of using
+     * Paint.setShadowLayer: shadow layers are silently ignored on a
+     * hardware-accelerated canvas unless the whole view is forced to a software
+     * layer, which is an expensive way to get readable text.
+     */
+    private fun drawLabel(canvas: Canvas, label: String, box: RectF) {
+        val padding = dp(4)
+        val textWidth = textPaint.measureText(label)
+        val textHeight = textPaint.textSize
+        val labelTop = (box.top - textHeight - padding * 2).coerceAtLeast(0f)
+        val labelLeft = box.left.coerceAtLeast(0f)
+        val labelRight = (labelLeft + textWidth + padding * 2).coerceAtMost(width.toFloat())
+
+        canvas.drawRect(
+            labelLeft,
+            labelTop,
+            labelRight,
+            labelTop + textHeight + padding * 2,
+            labelBackgroundPaint
+        )
+        canvas.drawText(label, labelLeft + padding, labelTop + padding + textPaint.textSize - textPaint.descent(), textPaint)
     }
 }
