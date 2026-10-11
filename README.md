@@ -189,4 +189,32 @@ silently falling back to the debug certificate.
 
 ## 📄 **License**
 
-This project is for educational purposes. Ensure compliance with local privacy laws when using face recognition technology. 
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE).
+
+You may use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+this software, including for commercial purposes, provided the copyright notice and this
+permission notice are retained. The software comes with **no warranty of any kind** and
+the authors accept **no liability** for its use.
+
+### Conditions of use that the license cannot impose, but you should
+
+MIT grants permission to use the code; it does not grant permission to process anybody's
+biometric data. If you build on this project, you are solely responsible for:
+
+- **Consent.** Do not capture, store, or match images of identifiable people without their
+  informed, specific consent — including people incidentally in frame behind your subject.
+- **Not for identification decisions.** This code detects faces and reports a *possible
+  match* from pose and geometry. It is not an identity check, has no liveness detection, and
+  must never gate access to anything, screen people, or support any decision about a person.
+  Read the honesty note under **⚠️ Limitations** above.
+- **Law.** Face/ biometric data is specially protected in many jurisdictions (GDPR Art. 9,
+  BIPA, Illinois/ Texas/ Washington statutes, and others) with their own consent, retention,
+  deletion, security, and impact-assessment duties. Some jurisdictions also restrict face
+  recognition in public places outright.
+- **Storage.** This demo keeps face templates on-device in app-private storage with
+  `allowBackup="false"` and never transmits frames. Preserve those properties if you fork it;
+  uploading face data to a server is a materially different legal and security posture.
+
+The disclaimer in the LICENSE is legally operative; the points above are not additional
+license terms — MIT is intentionally short and permissive — but please treat them as the
+intent of the release.
